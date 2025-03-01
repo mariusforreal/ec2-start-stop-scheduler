@@ -66,6 +66,66 @@ cron(0 * * * ? *)
 ```
 This ensures the function runs at the beginning of every hour.
 
+## Sample Template for CloudFormation/AWS Sam
+
+```
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Resources:
+  EC2SchedulerFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.8
+      CodeUri: ./
+      Description: 'EC2 Instance Scheduler based on KeepOn tags'
+      MemorySize: 128
+      Timeout: 30
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - 'ec2:DescribeInstances'
+                - 'ec2:StartInstances'
+                - 'ec2:StopInstances'
+              Resource: '*'
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: 'cron(0 * * * ? *)'
+            Description: 'Run every hour'
+```
+
+## Sample main.tf Template for deployment with Terraform
+
+```
+resource "aws_lambda_function" "ec2_scheduler" {
+  function_name    = "ec2-instance-scheduler"
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.8"
+  filename         = "lambda_function.zip"  # Create this ZIP with the Python code
+  source_code_hash = filebase64sha256("lambda_function.zip")
+  role             = aws_iam_role.lambda_role.arn
+  timeout          = 30
+  memory_size      = 128
+}
+
+resource "aws_cloudwatch_event_rule" "hourly" {
+  name                = "hourly-ec2-scheduler-trigger"
+  description         = "Trigger EC2 scheduler every hour"
+  schedule_expression = "cron(0 * * * ? *)"
+}
+
+resource "aws_cloudwatch_event_target" "run_ec2_scheduler" {
+  rule      = aws_cloudwatch_event_rule.hourly.name
+  target_id = "ec2_scheduler"
+  arn       = aws_lambda_function.ec2_scheduler.arn
+}
+```
+
+
 ## Contributing
 Feel free to submit issues or pull requests to improve functionality.
 
